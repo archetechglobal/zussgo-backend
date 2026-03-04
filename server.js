@@ -22,13 +22,17 @@ const nodemailer = require("nodemailer");
 
 // 1. Configure the "Mailman" (Transporter)
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // Must be false for port 587
   auth: {
-    user: process.env.EMAIL_USER, // Your Gmail
-    pass: process.env.EMAIL_PASS, // The 16-character App Password
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
-  debug: true, // <--- ADD THIS
-  logger: true, // <--- ADD THIS
+  tls: {
+    // This helps bypass some cloud network restrictions
+    rejectUnauthorized: false,
+  }, // <--- ADD THIS
 });
 
 // 2. Function to send the mail
