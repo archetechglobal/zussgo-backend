@@ -18,43 +18,34 @@ if (!fs.existsSync(path.join(__dirname, "data"))) {
   fs.mkdirSync(path.join(__dirname, "data"));
 }
 
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-// 1. Configure the "Mailman" (Transporter)
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // STARTTLS
-  service: "gmail", // This helps Nodemailer auto-configure the best path
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  // FORCE IPv4 ONLY: This is the fix for ENETUNREACH
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000,
-});
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// 2. Function to send the mail
 const sendWelcomeEmail = async (userEmail) => {
-  const mailOptions = {
-    from: '"ZussGo Team" <your-email@gmail.com>',
-    to: userEmail,
-    subject: "Welcome to the ZussGo Inner Circle! 🌍",
-    html: `
-            <h1>Thanks for joining ZussGo!</h1>
-            <p>We're building the future of safe, social travel in India, and we're thrilled to have you.</p>
-            <p>We'll notify you as soon as we launch our first set of "Trip Rooms."</p>
-            <br>
-            <p>Stay adventurous,<br>The ZussGo Team</p>
-        `,
-  };
-
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Thank you email sent to: ${userEmail}`);
+    // Note: On the Resend Free Tier, you can only send emails
+    // to the email address you used to sign up for Resend
+    // UNLESS you verify your own domain later.
+
+    await resend.emails.send({
+      from: "ZussGo <onboarding@resend.dev>", // Keep this as is for now
+      to: userEmail,
+      subject: "Welcome to the ZussGo Waitlist! 🌍",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
+          <h2 style="color: #7B2FF7;">You're on the list!</h2>
+          <p>Thanks for joining ZussGo. We're excited to have you with us.</p>
+          <p>We'll notify you as soon as we launch our travel match features.</p>
+          <br />
+          <p>Cheers,<br />The ZussGo Team</p>
+        </div>
+      `,
+    });
+    console.log(`📧 Email sent via Resend to: ${userEmail}`);
   } catch (error) {
-    console.error("Email Error:", error);
+    console.error("Resend Sending Error:", error);
   }
 };
 
