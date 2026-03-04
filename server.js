@@ -140,3 +140,13 @@ app.get("/api/admin/waitlist", (req, res) => {
   }
   res.json([]);
 });
+app.delete("/api/admin/clear-waitlist", (req, res) => {
+  try {
+    const emptyList = [];
+    fs.writeFileSync(DATA_FILE, JSON.stringify(emptyList, null, 2));
+    console.log("🗑️ Waitlist has been cleared for testing.");
+    res.json({ success: true, message: "Waitlist cleared successfully." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Could not clear list." });
+  }
+});
