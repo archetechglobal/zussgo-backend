@@ -105,7 +105,14 @@ app.post("/api/waitlist", async (req, res) => {
 
     waitlist.push(newUser);
     fs.writeFileSync(DATA_FILE, JSON.stringify(waitlist, null, 2));
-    await sendWelcomeEmail(newUser.email);
+    try {
+      await sendWelcomeEmail(newUser.email);
+      console.log(`📧 Email sent to ${newUser.email}`);
+    } catch (mailError) {
+      console.error("❌ Mail failed but user saved:", mailError);
+      // We still return 201 because the user IS on the list,
+      // but we log the error so we can fix the transporter.
+    }
 
     console.log(`✅ Success: ${email} added to ZussGo`);
     return res.status(201).json({
