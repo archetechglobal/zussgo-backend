@@ -24,15 +24,15 @@ const nodemailer = require("nodemailer");
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
-  secure: false, // Must be false for port 587
+  secure: false, // STARTTLS
+  service: "gmail", // This helps Nodemailer auto-configure the best path
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  tls: {
-    // This helps bypass some cloud network restrictions
-    rejectUnauthorized: false,
-  }, // <--- ADD THIS
+  // FORCE IPv4 ONLY: This is the fix for ENETUNREACH
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
 });
 
 // 2. Function to send the mail
@@ -125,4 +125,11 @@ app.post("/api/waitlist", async (req, res) => {
 // --- 3. START SERVER ---
 app.listen(PORT, () => {
   console.log(`🚀 ZussGo Server ready at http://localhost:${PORT}`);
+});
+app.get("/api/admin/waitlist", (req, res) => {
+  if (fs.existsSync(DATA_FILE)) {
+    const data = fs.readFileSync(DATA_FILE);
+    return res.json(JSON.parse(data));
+  }
+  res.json([]);
 });
