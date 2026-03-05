@@ -21,19 +21,45 @@ if (!fs.existsSync(path.join(__dirname, "data"))) {
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const sendWelcomeEmail = async (userEmail) => {
-  console.log("📨 Attempting to send email via API...");
-  const { data, error } = await resend.emails.send({
-    from: "ZussGo <hello@zussgo.com>", // Ensure domain is verified in Resend
-    to: userEmail,
-    subject: "Welcome to ZussGo!",
-    html: "<strong>You're in!</strong>",
-  });
+const sendWelcomeEmail = async (userEmail, count) => {
+  const displayCount = count + 411; // Starts the waitlist at #412
 
-  if (error) {
-    console.error("📧 Resend API Error:", error);
-  } else {
-    console.log("📧 Email sent! ID:", data.id);
+  try {
+    await resend.emails.send({
+      from: "ZussGo <hello@zussgo.com>",
+      to: userEmail,
+      subject: "Pack your bags! You're on the ZussGo list ✈️",
+      html: `
+        <div style="font-family: 'Helvetica', Arial, sans-serif; background-color: #ffffff; padding: 40px; border-radius: 20px; border: 1px solid #eee; max-width: 500px; margin: auto;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <span style="font-size: 40px;">🌍</span>
+            <h1 style="color: #7B2FF7; margin-top: 10px; letter-spacing: -1px;">Welcome to the Inner Circle</h1>
+          </div>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #444;">
+            The wait is almost over. We're building the future of social travel, and you're officially <strong>#${displayCount}</strong> in line.
+          </p>
+
+          <div style="background: linear-gradient(135deg, #7B2FF7, #F15A24); padding: 2px; border-radius: 12px; margin: 25px 0;">
+            <div style="background: white; padding: 20px; border-radius: 11px; text-align: center;">
+              <p style="margin: 0; color: #7B2FF7; font-weight: bold; font-size: 14px; text-transform: uppercase;">Your Global Rank</p>
+              <h2 style="margin: 5px 0 0; font-size: 32px; color: #333;">#${displayCount}</h2>
+            </div>
+          </div>
+
+          <p style="font-size: 15px; color: #666;">
+            We're letting people in in small batches to ensure the best travel matches. Want to skip the queue? Share your unique link with 3 friends.
+          </p>
+
+          <footer style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 12px; color: #aaa;">
+            ZussGo Travel Tech • Pune, India<br/>
+            Unsubscribe if you hate adventure.
+          </footer>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error("Email error:", error);
   }
 };
 // --- 2. THE LOGIC (The "Brain") ---
