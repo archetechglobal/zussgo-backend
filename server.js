@@ -1,29 +1,36 @@
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
+const mongoose = require("mongoose"); // Added Mongoose
 const validator = require("validator");
 require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-const DATA_FILE = path.join(__dirname, "data", "waitlist.json");
 
 // --- 1. SETUP & MIDDLEWARE ---
 app.use(cors());
-app.use(express.json()); // Essential: This allows Node to read JSON from Postman/Frontend
+app.use(express.json());
 
-// Create 'data' folder if it doesn't exist (keeps things organized)
-if (!fs.existsSync(path.join(__dirname, "data"))) {
-  fs.mkdirSync(path.join(__dirname, "data"));
-}
+// --- 2. MONGODB CONNECTION ---
+// Make sure to add MONGODB_URI to your Render Environment Variables
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => console.log("✅ Connected to ZussGo Database"))
+  .catch((err) => console.error("❌ MongoDB Connection Error:", err));
 
+// Define User Schema
+const waitlistSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, lowercase: true },
+  joinedAt: { type: Date, default: Date.now },
+});
+
+const Waitlist = mongoose.model("Waitlist", waitlistSchema);
+
+// --- 3. EMAIL LOGIC (Resend) ---
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const sendWelcomeEmail = async (userEmail, count) => {
-  const displayCount = count; // Starts the waitlist at #412
-
+const sendWelcomeEmail = async (userEmail, displayCount) => {
   try {
     await resend.emails.send({
       from: "ZussGo <hello@zussgo.com>",
@@ -62,38 +69,25 @@ const sendWelcomeEmail = async (userEmail, count) => {
     console.error("Email error:", error);
   }
 };
-// --- 2. THE LOGIC (The "Brain") ---
+
+// --- 4. THE LOGIC (API Routes) ---
 
 app.post("/api/waitlist", async (req, res) => {
   try {
     const { email } = req.body;
 
-    // A. Validation: Check if input is empty
-    if (!email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required!" });
-    }
-
-    // B. Validation: Check if it's a real email format
-    if (!validator.isEmail(email)) {
+    if (!email || !validator.isEmail(email)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid email format. Please check again.",
+        message: "Please provide a valid email address.",
       });
     }
 
-    // C. Persistence: Load existing users
-    let waitlist = [];
-    if (fs.existsSync(DATA_FILE)) {
-      const fileData = fs.readFileSync(DATA_FILE);
-      waitlist = JSON.parse(fileData);
-    }
-    const currentWaitlistPosition = waitlist.length + 412;
-    // D. Duplicate Check: Prevent same email twice
-    const alreadyExists = waitlist.some(
-      (user) => user.email.toLowerCase() === email.toLowerCase(),
-    );
+    // A. Duplicate Check using MongoDB
+    const alreadyExists = await Waitlist.findOne({
+      email: email.toLowerCase(),
+    });
+
     if (alreadyExists) {
       return res.status(409).json({
         success: false,
@@ -101,27 +95,26 @@ app.post("/api/waitlist", async (req, res) => {
       });
     }
 
-    // E. Save: Add new user with a timestamp
-    const newUser = {
-      email: email.toLowerCase(),
-      joinedAt: new Date().toISOString(),
-    };
+    // B. Save to Database
+    const newUser = new Waitlist({ email: email.toLowerCase() });
+    await newUser.save();
 
-    waitlist.push(newUser);
-    fs.writeFileSync(DATA_FILE, JSON.stringify(waitlist, null, 2));
+    // C. Get Rank (Current DB count + 412 offset)
+    const dbCount = await Waitlist.countDocuments();
+    const currentWaitlistPosition = dbCount + 411;
+
+    // D. Send Email
     try {
       await sendWelcomeEmail(newUser.email, currentWaitlistPosition);
       console.log(`📧 Email sent to ${newUser.email}`);
     } catch (mailError) {
-      console.error("❌ Mail failed but user saved:", mailError);
-      // We still return 201 because the user IS on the list,
-      // but we log the error so we can fix the transporter.
+      console.error("❌ Mail failed but user saved to DB:", mailError);
     }
 
-    console.log(`✅ Success: ${email} added to ZussGo`);
+    console.log(`✅ Success: ${email} added to MongoDB`);
     return res.status(201).json({
       success: true,
-      message: "Welcome to ZussGo! You're officially on the waitlist.",
+      message: "Welcome to ZussGo!",
       count: currentWaitlistPosition,
     });
   } catch (error) {
@@ -133,24 +126,30 @@ app.post("/api/waitlist", async (req, res) => {
   }
 });
 
-// --- 3. START SERVER ---
-app.listen(PORT, () => {
-  console.log(`🚀 ZussGo Server ready at http://localhost:${PORT}`);
-});
-app.get("/api/admin/waitlist", (req, res) => {
-  if (fs.existsSync(DATA_FILE)) {
-    const data = fs.readFileSync(DATA_FILE);
-    return res.json(JSON.parse(data));
-  }
-  res.json([]);
-});
-app.delete("/api/admin/clear-waitlist", (req, res) => {
+// --- 5. ADMIN ROUTES ---
+
+// Get all users
+app.get("/api/admin/waitlist", async (req, res) => {
   try {
-    const emptyList = [];
-    fs.writeFileSync(DATA_FILE, JSON.stringify(emptyList, null, 2));
-    console.log("🗑️ Waitlist has been cleared for testing.");
+    const users = await Waitlist.find().sort({ joinedAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching list" });
+  }
+});
+
+// Clear waitlist (Testing only)
+app.delete("/api/admin/clear-waitlist", async (req, res) => {
+  try {
+    await Waitlist.deleteMany({});
+    console.log("🗑️ Database cleared.");
     res.json({ success: true, message: "Waitlist cleared successfully." });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Could not clear list." });
+    res.status(500).json({ success: false, message: "Could not clear DB." });
   }
+});
+
+// --- 6. START SERVER ---
+app.listen(PORT, () => {
+  console.log(`🚀 ZussGo Server ready at PORT: ${PORT}`);
 });
