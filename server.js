@@ -18,37 +18,48 @@ if (!fs.existsSync(path.join(__dirname, "data"))) {
   fs.mkdirSync(path.join(__dirname, "data"));
 }
 
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize the SMTP transporter for Resend
+const transporter = nodemailer.createTransport({
+  host: "smtp.resend.com",
+  port: 465,
+  secure: true, // Port 465 uses SSL
+  auth: {
+    user: "resend",
+    pass: process.env.RESEND_API_KEY, // Stored safely in Render Env
+  },
+});
 
 const sendWelcomeEmail = async (userEmail) => {
   try {
-    // Note: On the Resend Free Tier, you can only send emails
-    // to the email address you used to sign up for Resend
-    // UNLESS you verify your own domain later.
-
-    await resend.emails.send({
-      from: "ZussGo <onboarding@resend.dev>", // Keep this as is for now
+    // 💡 IMPORTANT: Now that your domain is verified,
+    // you can use any name before @zussgo.com (e.g., hello, support, hi)
+    await transporter.sendMail({
+      from: "ZussGo <hello@zussgo.com>",
       to: userEmail,
-      subject: "Welcome to the ZussGo Waitlist! 🌍",
+      subject: "Welcome to ZussGo! 🚀 Your trip starts here",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
-          <h2 style="color: #7B2FF7;">You're on the list!</h2>
-          <p>Thanks for joining ZussGo. We're excited to have you with us.</p>
-          <p>We'll notify you as soon as we launch our travel match features.</p>
-          <br />
-          <p>Cheers,<br />The ZussGo Team</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; padding: 40px; border-radius: 12px;">
+          <h1 style="color: #7B2FF7; text-align: center;">You're in! 🌍</h1>
+          <p style="font-size: 16px; color: #333;">Hi traveler,</p>
+          <p style="font-size: 16px; color: #333; line-height: 1.6;">
+            Thanks for joining the ZussGo waitlist. We’re building a community where finding your perfect travel match is safer, faster, and more exciting.
+          </p>
+          <div style="background-color: #f8f5ff; padding: 20px; border-radius: 8px; margin: 30px 0; text-align: center;">
+            <p style="margin: 0; font-weight: bold; color: #7B2FF7;">Stay tuned for your beta invite code!</p>
+          </div>
+          <p style="font-size: 14px; color: #888; text-align: center;">
+            Follow our journey at <a href="https://zussgo.com" style="color: #7B2FF7; text-decoration: none;">zussgo.com</a>
+          </p>
         </div>
       `,
     });
-    console.log(`📧 Email sent via Resend to: ${userEmail}`);
+    console.log(`📧 Professional email sent to: ${userEmail}`);
   } catch (error) {
-    console.error("Resend Sending Error:", error);
+    console.error("SMTP Error:", error);
   }
 };
-
 // --- 2. THE LOGIC (The "Brain") ---
 
 app.post("/api/waitlist", async (req, res) => {
