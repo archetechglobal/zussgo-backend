@@ -22,7 +22,7 @@ const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendWelcomeEmail = async (userEmail, count) => {
-  const displayCount = count + 411; // Starts the waitlist at #412
+  const displayCount = count; // Starts the waitlist at #412
 
   try {
     await resend.emails.send({
@@ -48,11 +48,11 @@ const sendWelcomeEmail = async (userEmail, count) => {
           </div>
 
           <p style="font-size: 15px; color: #666;">
-            We're letting people in in small batches to ensure the best travel matches. Want to skip the queue? Share your unique link with 3 friends.
+            We're letting people in small batches to ensure the best travel matches.
           </p>
 
           <footer style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 12px; color: #aaa;">
-            ZussGo Travel Tech • Pune, India<br/>
+            ZussGo Travel Tech • Hyderabad, India<br/>
             Unsubscribe if you hate adventure.
           </footer>
         </div>
@@ -89,7 +89,7 @@ app.post("/api/waitlist", async (req, res) => {
       const fileData = fs.readFileSync(DATA_FILE);
       waitlist = JSON.parse(fileData);
     }
-
+    const currentWaitlistPosition = waitlist.length + 412;
     // D. Duplicate Check: Prevent same email twice
     const alreadyExists = waitlist.some(
       (user) => user.email.toLowerCase() === email.toLowerCase(),
@@ -110,7 +110,7 @@ app.post("/api/waitlist", async (req, res) => {
     waitlist.push(newUser);
     fs.writeFileSync(DATA_FILE, JSON.stringify(waitlist, null, 2));
     try {
-      await sendWelcomeEmail(newUser.email);
+      await sendWelcomeEmail(newUser.email, currentWaitlistPosition);
       console.log(`📧 Email sent to ${newUser.email}`);
     } catch (mailError) {
       console.error("❌ Mail failed but user saved:", mailError);
@@ -122,7 +122,7 @@ app.post("/api/waitlist", async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Welcome to ZussGo! You're officially on the waitlist.",
-      count: waitlist.length,
+      count: currentWaitlistPosition,
     });
   } catch (error) {
     console.error("Server Error:", error);
